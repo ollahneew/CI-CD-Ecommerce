@@ -23,6 +23,12 @@ jobs:
     # This is telling GitHub to run the workflow on the latest version of Ubuntu.
     runs-on: ubuntu-latest
     steps:
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+        node-version: '20'
+
       # Checkout the code from the GitHub repository
       - name: Checkout code
         uses: actions/checkout@v3
