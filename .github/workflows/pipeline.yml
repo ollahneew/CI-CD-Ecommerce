@@ -26,7 +26,7 @@ jobs:
 
       # Checkout the code from the GitHub repository
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
       # Login to Docker Hub using credentials from repository secrets
       - name: Login to Docker Hub
@@ -35,8 +35,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Install dependencies, export environment variables
+      # Install dependencies, export environment variables to be used by application and run tests for the server application
       - name: Install and Test Server
+        working-directory: ./backend-ecomerce
         run: |
           npm install
           export MONGO_DB=${{ secrets.MONGO_DB }}
@@ -47,6 +48,21 @@ jobs:
           export MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
           export MAIL_ACCOUNT=${{ secrets.MAIL_ACCOUNT }}
           npm run test
+
+      
+      # Install dependencies and run tests for the client application
+      - name: Install and Test Client
+        working-directory: ./Ecommerce
+        run: |
+          npm install
+          npm run test
+
+      # Build a Docker image for the client application
+      - name: Build Client Docker Image
+        working-directory: ./Ecommerce
+        # Build image with tag ollah/ecomerce:client
+        run: |
+          docker build -t ollah/ecomerce:client-${{github.run_number}} .
 
       # Build a Docker image for the server application
       - name: Build Server Docker Image
@@ -60,7 +76,8 @@ jobs:
 
       # Push the Docker images to Docker Hub
       - name: Push Docker Images to Docker Hub
-        run:
+        run: |
+          docker push ollah/ecomerce:client-${{github.run_number}}
           docker push ollah/ecomerce:server-${{github.run_number}}
    # Job 2: Deploy to server
       - name: Deploy to server
@@ -72,11 +89,15 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # Pull the image that was pushed to DockerHub above
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ecomerce:client-${{github.run_number}}
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ecomerce:server-${{github.run_number}}
 
             # Stop and remove the current container (if any)
+            docker stop ecomerce-client
+            docker rm ecomerce-client
             docker stop ecomerce-server
             docker rm ecomerce-server
 
             # Run a new container with the image pulled above
+            docker run -d -p 3000:3000 --name ecomerce-client ${{ secrets.DOCKERHUB_USERNAME }}/ecomerce:client-${{github.run_number}}
             docker run -d -p 3001:3001 --name ecomerce-server ${{ secrets.DOCKERHUB_USERNAME }}/ecomerce:server-${{github.run_number}}
